@@ -5,6 +5,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-void swift_launch_app(void);
+#include "c.h"
+
+typedef struct demo_context swift_demo_context;
+
+void swift_launch_app(struct demo_context *ctx);
 
 #endif // TEST_SWIFT_H

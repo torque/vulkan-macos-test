@@ -1,9 +1,9 @@
 import Cocoa
 
 @_cdecl("swift_launch_app")
-public func launch_app() {
+public func launch_app(demo_ctx: OpaquePointer?) {
     let app = NSApplication.shared
-    let delegate = MainDelegate()
+    let delegate = MainDelegate(demo_ctx: demo_ctx)
     app.delegate = delegate
     app.setActivationPolicy(.regular)
 
@@ -13,15 +13,15 @@ public func launch_app() {
 class MainDelegate: NSObject, NSApplicationDelegate {
     let window: NSWindow
 
-    override init() {
+    init(demo_ctx: OpaquePointer?) {
         let contentRect = NSRect(x: 0, y: 0, width: 50, height: 50);
-        self.window = NSWindow.init(
+        self.window = NSWindow(
             contentRect: contentRect,
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: true
         )
-        let viewController = MainViewController()
+        let viewController = MainViewController(demo_ctx: demo_ctx)
         // viewController.view = MainView(frame: contentRect)
         self.window.contentViewController = viewController
 
@@ -30,11 +30,11 @@ class MainDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("yeah ok")
-        print_int(5)
 
         self.window.title = "word"
         self.window.makeKeyAndOrderFront(nil)
         self.window.makeMain()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -42,71 +42,85 @@ class MainDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+class WindowDelegate: NSObject, NSWindowDelegate {
+
+}
+
 class MainViewController: NSViewController {
-    var link: CVDisplayLink?
+    var link: CVDisplayLink!
+    var _view: MainView
+
+    init(demo_ctx: OpaquePointer?) {
+        let contentRect = NSRect(x: 0, y: 0, width: 720, height: 720);
+        self._view = MainView(frame: contentRect, demo_ctx: demo_ctx)
+
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError("no") }
 
     override func loadView() {
         print("load view")
-        let contentRect = NSRect(x: 0, y: 0, width: 720, height: 720);
-        self.view = MainView(frame: contentRect)
+        self.view = self._view
     }
 
     override func viewDidLoad() {
         print("loading")
 
         super.viewDidLoad()
+        // self._view.resizeSubviews(withOldSize: NSSize(width: 720, height: 720))
 
         print("loaded")
-        CVDisplayLinkCreateWithActiveCGDisplays(&self.link)
-        CVDisplayLinkSetOutputCallback(
-            self.link!,
-            update_display,
-            UnsafeMutableRawPointer(Unmanaged.passUnretained(self.view).toOpaque())
-        )
 
-        CVDisplayLinkStart(self.link!)
+        CVDisplayLinkCreateWithActiveCGDisplays(&self.link)
+        CVDisplayLinkSetOutputHandler(self.link) {
+            link, now, outputTime, flagsIn, flagsOut -> CVReturn in
+
+            self._view.demo()
+            return kCVReturnSuccess
+        }
+
+        CVDisplayLinkStart(self.link)
         print("linked")
     }
-}
-
-func update_display(
-    link: CVDisplayLink,
-    now: UnsafePointer<CVTimeStamp>,
-    outputTime: UnsafePointer<CVTimeStamp>,
-    flagsIn: CVOptionFlags,
-    flagsOut: UnsafeMutablePointer<CVOptionFlags>,
-    target: UnsafeMutableRawPointer?
-) -> CVReturn {
-    let view = unsafeBitCast(target, to: MainView.self)
-    view.proof()
-
-    return kCVReturnSuccess;
 }
 
 class MainView: NSView {
     var counter: Double = 0.0
     var viewQueue: MTLCommandQueue?
+    let demo_ctx: OpaquePointer?
 
-    override var wantsLayer: Bool { get {return true} set(new) {} }
     override var wantsUpdateLayer: Bool { return true }
+
+    init(frame: NSRect, demo_ctx: OpaquePointer?) {
+        self.demo_ctx = demo_ctx
+
+        super.init(frame: frame)
+
+        self.wantsLayer = true
+        self.layerContentsRedrawPolicy = .crossfade
+    }
+
+    required init?(coder: NSCoder) { fatalError("nope!") }
 
     override func makeBackingLayer() -> CALayer {
         print("layering")
         let layer = CAMetalLayer()
-
-        layer.isOpaque = false
-        layer.device = MTLCreateSystemDefaultDevice()
         layer.drawsAsynchronously = true
 
         let viewScale = self.convertToBacking(CGSize(width: 1.0, height: 1.0))
         layer.contentsScale = min(viewScale.width, viewScale.height)
+        layer.frame = self.bounds
+        print("vs: \(viewScale), \(layer.contentsRect)")
+        print("layered \(self.demo_ctx!), \(Unmanaged.passUnretained(layer).toOpaque()) \(self.bounds)")
 
-        print("deviced")
-        self.viewQueue = layer.device!.makeCommandQueue()
-        print("queue")
+        demo_setup(self.demo_ctx, Unmanaged.passUnretained(layer).toOpaque())
 
-        print("layered")
         return layer
+    }
+
+    func demo() {
+        demo_redraw(self.demo_ctx)
     }
 
     func proof() {
