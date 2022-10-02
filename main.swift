@@ -12,6 +12,7 @@ public func launch_app(demo_ctx: OpaquePointer?) {
 
 class MainDelegate: NSObject, NSApplicationDelegate {
     let window: NSWindow
+    let windowDelegate: WindowDelegate
 
     init(demo_ctx: OpaquePointer?) {
         let contentRect = NSRect(x: 0, y: 0, width: 50, height: 50);
@@ -21,9 +22,11 @@ class MainDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: true
         )
+        self.windowDelegate = WindowDelegate()
+
         let viewController = MainViewController(demo_ctx: demo_ctx)
-        // viewController.view = MainView(frame: contentRect)
         self.window.contentViewController = viewController
+        self.window.delegate = self.windowDelegate
 
         super.init()
     }
@@ -31,7 +34,9 @@ class MainDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("yeah ok")
 
-        self.window.title = "word"
+        self.window.title = "ＴＥＳＴ"
+        self.window.center()
+        self.window.setFrameOrigin(NSPoint(x: self.window.frame.origin.x, y: self.window.frame.origin.y - 100))
         self.window.makeKeyAndOrderFront(nil)
         self.window.makeMain()
         NSApp.activate(ignoringOtherApps: true)
@@ -43,7 +48,55 @@ class MainDelegate: NSObject, NSApplicationDelegate {
 }
 
 class WindowDelegate: NSObject, NSWindowDelegate {
+    var windowFrame: NSRect? = nil
 
+    func customWindowsToEnterFullScreen(for window: NSWindow) -> [NSWindow]? {
+        // I don't know how to replicate the default reduced motion fullscreen
+        // animation. It seems we would have to create a duplicate window
+        // (the default animation crossfades the normal-sized window into a
+        // fullscreen duplicate—they're both visible on the screen
+        // simultaneously during the animation).
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            return nil
+        } else {
+            return [window]
+        }
+    }
+
+    func customWindowsToExitFullScreen(for window: NSWindow) -> [NSWindow]? {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            return nil
+        } else {
+            return [window]
+        }
+    }
+
+    func window(_ window: NSWindow, startCustomAnimationToEnterFullScreenWithDuration duration: TimeInterval) {
+        self.windowFrame = window.frame
+        window.styleMask.insert(.fullScreen)
+        NSAnimationContext.runAnimationGroup() { context in
+            context.duration = duration
+            window.animator().setFrame(window.screen!.frame, display: true)
+        }
+    }
+
+    func window(_ window: NSWindow, startCustomAnimationToExitFullScreenWithDuration duration: TimeInterval) {
+        // this has to be done before removing the fullScreen style mask on some
+        // monitor layouts, otherwise the window will teleport to the wrong
+        // monitor. I'm not sure why this happens (it happens on the bottom
+        // monitor if you have two vertically stacked monitors) but I'm
+        // guessing it's due to a bad interaction with the menubar.
+        window.setFrame(window.screen!.visibleFrame, display: true)
+        window.styleMask.remove(.fullScreen)
+        NSAnimationContext.runAnimationGroup() { context in
+            context.duration = duration
+            window.animator().setFrame(self.windowFrame!, display: true)
+        }
+    }
+
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        print("whoops")
+    }
 }
 
 class MainViewController: NSViewController {
@@ -170,7 +223,3 @@ class MainView: NSView {
         return true
     }
 }
-
-// class MainWindow: NSWindow {
-
-// }
