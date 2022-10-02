@@ -10,13 +10,26 @@ public func launch_app(demo_ctx: OpaquePointer?) {
     app.run()
 }
 
+class MainWindow: NSWindow {
+    override func keyDown(with event: NSEvent) {
+        switch event.charactersIgnoringModifiers {
+            case "f":
+                self.toggleFullScreen(nil)
+            case "q":
+                NSApp.terminate(nil)
+            default:
+                super.keyDown(with: event)
+        }
+    }
+}
+
 class MainDelegate: NSObject, NSApplicationDelegate {
-    let window: NSWindow
+    let window: MainWindow
     let windowDelegate: WindowDelegate
 
     init(demo_ctx: OpaquePointer?) {
         let contentRect = NSRect(x: 0, y: 0, width: 50, height: 50);
-        self.window = NSWindow(
+        self.window = MainWindow(
             contentRect: contentRect,
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
