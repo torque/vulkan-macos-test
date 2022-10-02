@@ -32,8 +32,6 @@ class MainDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("yeah ok")
-
         self.window.title = "ＴＥＳＴ"
         self.window.center()
         self.window.setFrameOrigin(NSPoint(x: self.window.frame.origin.x, y: self.window.frame.origin.y - 100))
@@ -113,17 +111,11 @@ class MainViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("no") }
 
     override func loadView() {
-        print("load view")
         self.view = self._view
     }
 
     override func viewDidLoad() {
-        print("loading")
-
         super.viewDidLoad()
-        // self._view.resizeSubviews(withOldSize: NSSize(width: 720, height: 720))
-
-        print("loaded")
 
         CVDisplayLinkCreateWithActiveCGDisplays(&self.link)
         CVDisplayLinkSetOutputHandler(self.link) {
@@ -134,7 +126,6 @@ class MainViewController: NSViewController {
         }
 
         CVDisplayLinkStart(self.link)
-        print("linked")
     }
 }
 
@@ -157,15 +148,12 @@ class MainView: NSView {
     required init?(coder: NSCoder) { fatalError("nope!") }
 
     override func makeBackingLayer() -> CALayer {
-        print("layering")
         let layer = CAMetalLayer()
         layer.drawsAsynchronously = true
 
         let viewScale = self.convertToBacking(CGSize(width: 1.0, height: 1.0))
         layer.contentsScale = min(viewScale.width, viewScale.height)
         layer.frame = self.bounds
-        print("vs: \(viewScale), \(layer.contentsRect)")
-        print("layered \(self.demo_ctx!), \(Unmanaged.passUnretained(layer).toOpaque()) \(self.bounds)")
 
         demo_setup(self.demo_ctx, Unmanaged.passUnretained(layer).toOpaque())
 
